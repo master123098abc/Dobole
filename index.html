@@ -96,10 +96,17 @@
             box-shadow: 0 0 10px rgba(0, 243, 255, 0.2) inset;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background: var(--neon-blue);
             color: var(--bg-color);
             box-shadow: 0 0 20px var(--neon-blue);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            border-color: #555;
+            color: #555;
+            box-shadow: none;
         }
 
         .btn-pink {
@@ -243,6 +250,7 @@
             });
             peer.on('connection', function(connection) {
                 conn = connection;
+                setupConnectionListeners();
                 startGame();
             });
         }
@@ -250,196 +258,67 @@
         function joinRoom() {
             let joinId = document.getElementById('join-id').value;
             if(!joinId) return alert("Enter the connection code first.");
-            conn = peer.connect(joinId);
+            // Added reliable: true to prevent connection dropping
+            conn = peer.connect(joinId, { reliable: true });
+            
             conn.on('open', function() {
+                setupConnectionListeners();
                 startGame();
                 document.getElementById('draw-btn').style.display = 'none'; // Only Control can transmit
+            });
+        }
+
+        function setupConnectionListeners() {
+            conn.on('data', function(data) {
+                showTaskOnScreen(data);
+                if("vibrate" in navigator) navigator.vibrate([100, 50, 100, 50, 200]); 
+            });
+            
+            conn.on('close', function() {
+                document.getElementById('status-text').innerText = "[ CONNECTION LOST - REFRESH PAGE ]";
+                document.getElementById('status-text').style.color = "red";
             });
         }
 
         function startGame() {
             document.getElementById('setup-board').style.display = 'none';
             document.getElementById('game-board').style.display = 'block';
-
-            conn.on('data', function(data) {
-                showTaskOnScreen(data);
-                if("vibrate" in navigator) navigator.vibrate([100, 50, 100, 50, 200]); // Techy vibration pattern
-            });
         }
 
         function drawTask() {
             let randomTask = intenseTasks[Math.floor(Math.random() * intenseTasks.length)];
             
             let display = document.getElementById('task-display');
+            let btn = document.getElementById('draw-btn');
+            
             display.classList.remove('pulse-text');
             display.classList.add('flicker');
             display.innerText = "DECRYPTING COMMAND...";
             
-            // Disable button briefly to prevent spam
-            let btn = document.getElementById('draw-btn');
+            // Disable button
             btn.disabled = true;
             btn.style.opacity = 0.5;
             
             setTimeout(() => {
                 display.classList.remove('flicker');
                 showTaskOnScreen(randomTask);
-                conn.send(randomTask); 
                 
-                btn.disabled = false;
-                btn.style.opacity = 1;
-            }, 1200);
-        }
-
-        function showTaskOnScreen(taskText) {
-            document.getElementById('task-display').innerHTML = `<span style="color: #fff; text-shadow: 0 0 8px var(--neon-blue);">${taskText}</span>`;
-        }
-    </script>
-</body>
-</html>
-            transition: 0.3s;
-        }
-
-        .pulse-text {
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 0.7; text-shadow: 0 0 5px var(--neon-pink); }
-            50% { opacity: 1; text-shadow: 0 0 20px var(--neon-pink); }
-            100% { opacity: 0.7; text-shadow: 0 0 5px var(--neon-pink); }
-        }
-
-        .flicker {
-            animation: flicker 0.15s infinite;
-        }
-
-        @keyframes flicker {
-            0% { opacity: 0.9; color: var(--neon-blue); }
-            50% { opacity: 0.2; color: #fff; }
-            100% { opacity: 1; color: var(--neon-pink); }
-        }
-    </style>
-</head>
-<body>
-
-    <h1>SYNC PROTOCOL</h1>
-    <p class="subtitle">Neural Link Established</p>
-
-    <div class="container" id="setup-board">
-        <p style="color: var(--neon-blue);">[ INITIATE CONNECTION ]</p>
-        
-        <button onclick="createRoom()">1. Generate Link Code (Control)</button>
-        <div id="room-id-display" class="secret-code" style="display:none;">Generating...</div>
-        
-        <hr style="border-color: rgba(255,255,255,0.1); margin: 30px 0;">
-        
-        <p style="color: var(--neon-pink);">[ OR ENTER EXISTING LINK ]</p>
-        <input type="text" id="join-id" placeholder="Paste Code Here">
-        <button class="btn-pink" onclick="joinRoom()">2. Synchronize (Submit)</button>
-    </div>
-
-    <div class="container" id="game-board">
-        <p id="status-text" style="color: var(--neon-blue); font-weight: bold; text-shadow: 0 0 5px var(--neon-blue);">[ DEVICES SYNCHRONIZED ]</p>
-        
-        <div id="task-display" class="pulse-text">Awaiting transmission...</div>
-        
-        <button onclick="drawTask()" id="draw-btn">Transmit Command</button>
-    </div>
-
-    <script>
-        const intenseTasks = [
-            // Pain & Marking
-            "Bite your own forearm or wrist until it leaves clear teeth marks. Send a view-once photo of my temporary mark on you.",
-            "Spank your own thigh 5 times, hard. Send a voice note where I can hear the slaps, and count them out loud for me.",
-            "Drag your nails down your chest or stomach hard enough to leave faint red lines. Send a view-once picture of the scratches.",
-            "Pinch the sensitive skin of your inner thigh as hard as you can bear for 10 seconds. Send a photo of the red mark.",
-            "Wrap your hand in your own hair and pull your head back hard. Take a photo of your exposed throat.",
-            "Slap your own cheek sharply. Send a voice note of the sound, followed by you saying, 'Thank you.'",
-            "Bite your bottom lip as hard as you can without drawing blood. Hold it for 10 seconds. Send a close-up photo.",
-            
-            // Temperature & Sensory
-            "Hold an ice cube in your mouth until it hurts from the cold, then use your wet fingers to touch your most sensitive spot. Send a video.",
-            "Take a drop of hot (but safe) wax or hot water, and let it drop onto your stomach. Send a voice note of your reaction.",
-            "Rub a dry towel aggressively over your bare skin until it burns slightly and turns pink. Send a photo.",
-            "Close your eyes. Run your nails lightly over your skin, right on the edge of where it tickles and hurts. Send audio.",
-            "Bite down on your own finger hard enough to feel pressure. Look at the camera with glossy eyes and send a photo.",
-
-            // Denial & Teasing
-            "Touch yourself exactly how you like it until you are right on the edge. Then STOP completely. Send a voice note of your breathing.",
-            "Keep your hands firmly pinned behind your back. You are not allowed to touch yourself for the next 10 minutes.",
-            "Hover your fingers barely a millimeter above your skin without making contact. Send a video of your shaking hands.",
-            "Voice note: Beg me to let you finish. Tell me exactly how much it hurts to be denied right now.",
-            "Rub your most sensitive spot rapidly through your clothes for 60 seconds without stopping. Send the audio.",
-            "Type: 'I am aching for you.' You are not allowed to move until I give you permission.",
-
-            // Humiliation & Obedience
-            "Kneel on a hard floor. Stay there until your knees ache. Send a photo looking up from the floor.",
-            "Take a marker or pen. Write 'YOURS' across your stomach or chest. Send a view-once photo.",
-            "Strip completely naked. Stand in the coldest part of your room until you get goosebumps. Send a photo.",
-            "Record a voice note of yourself whimpering my name. I want to hear the desperation.",
-            "Put your face flat against the floor. Send a voice note saying, 'I am entirely at your mercy.'",
-            "Hold a heavy object in each hand with your arms stretched straight out. Hold until your muscles burn. Send a video.",
-            "If you have a belt, wrap it tightly around your upper arm to create a squeeze. Take a photo of the pressure.",
-            "Voice note: Describe exactly how you want me to punish you the next time you misbehave.",
-            "Trace the edge of a cold metal spoon slowly down your neck and chest. Send a video.",
-            "Spread your legs and stay completely still. Send a voice note describing the exact physical ache right now.",
-            "Look into the camera. Slap your own thigh hard, bite your lip, and whisper, 'More, please.' Send the video."
-        ];
-
-        let peer = new Peer();
-        let conn;
-
-        function createRoom() {
-            document.getElementById('room-id-display').style.display = 'block';
-            peer.on('open', function(id) {
-                document.getElementById('room-id-display').innerText = id;
-            });
-            peer.on('connection', function(connection) {
-                conn = connection;
-                startGame();
-            });
-        }
-
-        function joinRoom() {
-            let joinId = document.getElementById('join-id').value;
-            if(!joinId) return alert("Enter the connection code first.");
-            conn = peer.connect(joinId);
-            conn.on('open', function() {
-                startGame();
-                document.getElementById('draw-btn').style.display = 'none'; // Only Control can transmit
-            });
-        }
-
-        function startGame() {
-            document.getElementById('setup-board').style.display = 'none';
-            document.getElementById('game-board').style.display = 'block';
-
-            conn.on('data', function(data) {
-                showTaskOnScreen(data);
-                if("vibrate" in navigator) navigator.vibrate([100, 50, 100, 50, 200]); // Techy vibration pattern
-            });
-        }
-
-        function drawTask() {
-            let randomTask = intenseTasks[Math.floor(Math.random() * intenseTasks.length)];
-            
-            let display = document.getElementById('task-display');
-            display.classList.remove('pulse-text');
-            display.classList.add('flicker');
-            display.innerText = "DECRYPTING COMMAND...";
-            
-            // Disable button briefly to prevent spam
-            let btn = document.getElementById('draw-btn');
-            btn.disabled = true;
-            btn.style.opacity = 0.5;
-            
-            setTimeout(() => {
-                display.classList.remove('flicker');
-                showTaskOnScreen(randomTask);
-                conn.send(randomTask); 
+                // Safety net: Try to send, but ALWAYS re-enable the button even if it fails
+                try {
+                    if(conn && conn.open) {
+                        conn.send(randomTask); 
+                    } else {
+                        document.getElementById('status-text').innerText = "[ WARNING: DEVICE DISCONNECTED ]";
+                        document.getElementById('status-text').style.color = "red";
+                    }
+                } catch (error) {
+                    console.error("Transmission failed", error);
+                } finally {
+                    // This ensures the button ALWAYS comes back
+                    btn.disabled = false;
+                    btn.style.opacity = 1;
+                }
                 
-                btn.disabled = false;
-                btn.style.opacity = 1;
             }, 1200);
         }
 
